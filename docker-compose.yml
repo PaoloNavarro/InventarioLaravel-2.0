@@ -1,61 +1,52 @@
-
-
+# docker-compose.yml (Solo para Desarrollo Local)
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: laravel_app
-    volumes:
-      - .:/var/www/html  # Sincroniza tu código con el contenedor
-    networks:
-      - laravel_network
-    depends_on:
-      - db
-    environment:
-      - DB_CONNECTION=mysql
-      - DB_HOST=db
-      - DB_PORT=3306
-      - DB_DATABASE=ferreteria_db
-      - DB_USERNAME=ferreteria_user
-      - DB_PASSWORD=ferreteria_password
-    restart: always
-
-  nginx:
-    image: nginx:latest
-    container_name: laravel_nginx
+    # Construye la imagen usando tu Dockerfile local.
+    build: .
+    container_name: laravel_app_local
     ports:
-      - "8080:80"  # Acceso en http://localhost:8080
+      - "8080:80"
     volumes:
-      - .:/var/www/html
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+      # Montamos el código local. Esto SOBRESCRIBE el 'COPY' del Dockerfile.
+      # Útil para ver cambios al instante sin reconstruir la imagen.
+      - ./:/app
+    environment:
+      - WEB_DOCUMENT_ROOT=/app/public
+      - APP_ENV=${APP_ENV:-local}
+      - APP_DEBUG=${APP_DEBUG:-true}
+      - PHP_DISPLAY_ERRORS=${PHP_DISPLAY_ERRORS:-1}
+      - PHP_MEMORY_LIMIT=${PHP_MEMORY_LIMIT:-512M}
+      - APP_KEY=${APP_KEY}
     depends_on:
-      - app
-    networks:
-      - laravel_network
+      db:
+        condition: service_healthy
+    # No necesitamos un 'command' aquí porque el 'ENTRYPOINT' en el Dockerfile
+    # ya se encarga de iniciar PHP-FPM y Nginx.
+    # Los permisos también se manejan ahora que el volumen está montado.
+    # Si aún tuvieras problemas de permisos con el volumen montado, podrías añadir un 'command'
+    # como: command: sh -c "chown -R application:application /app/storage /app/bootstrap/cache && /usr/local/bin/docker-entrypoint.sh php-fpm"
+    # Pero intentemos sin él primero, ya que el ENTRYPOINT es más limpio.
 
   db:
     image: mysql:8.0
-    container_name: laravel_mysql
+    container_name: laravel_db_local
+    restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: secret
-      MYSQL_DATABASE: ferreteria_db
-      MYSQL_USER: ferreteria_user
-      MYSQL_PASSWORD: ferreteria_password
-      
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
     ports:
       - "3306:3306"
-    networks:
-      - laravel_network
     volumes:
-      - mysql_data:/var/lib/mysql
-    restart: always
-    command:
-      --log-bin=binlog --binlog-format=ROW --log_bin_trust_function_creators=1  # Activa la opción
+      - db_data:/var/lib/mysql
+    command: --log-bin-trust-function-creators=1
+
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u$$MYSQL_USER", "-p$$MYSQL_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
-  mysql_data:
-
-networks:
-  laravel_network:
-    driver: bridge
+  db_data:
