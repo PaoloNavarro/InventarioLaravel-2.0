@@ -15,7 +15,7 @@ WORKDIR /var/www/html
 COPY . /var/www/html
 
 # Instala dependencias de Laravel
-RUN composer install --no-dev --optimize-autoloader
+RUN composer install  
 
 # Verifica si el directorio vendor está presente
 RUN ls -alh /var/www/html/vendor
@@ -27,4 +27,7 @@ RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cac
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
 EXPOSE 9000
-CMD ["php-fpm"]
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+ENTRYPOINT ["entrypoint.sh"]
