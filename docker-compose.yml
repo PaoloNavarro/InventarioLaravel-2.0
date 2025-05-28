@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: laravel_app
+    volumes:
+      - .:/var/www/html  # Sincroniza tu código con el contenedor
+    networks:
+      - laravel_network
+    depends_on:
+      - db
+    environment:
+      - DB_CONNECTION=mysql
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_DATABASE=ferreteria_db
+      - DB_USERNAME=ferreteria_user
+      - DB_PASSWORD=ferreteria_password
+    restart: always
+
+  nginx:
+    image: nginx:latest
+    container_name: laravel_nginx
+    ports:
+      - "8080:80"  # Acceso en http://localhost:8080
+    volumes:
+      - .:/var/www/html
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - app
+    networks:
+      - laravel_network
+
+  db:
+    image: mysql:8.0
+    container_name: laravel_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: secret
+      MYSQL_DATABASE: ferreteria_db
+      MYSQL_USER: ferreteria_user
+      MYSQL_PASSWORD: ferreteria_password
+      
+    ports:
+      - "3306:3306"
+    networks:
+      - laravel_network
+    volumes:
+      - mysql_data:/var/lib/mysql
+    restart: always
+    command:
+      --log-bin=binlog --binlog-format=ROW --log_bin_trust_function_creators=1  # Activa la opción
+
+volumes:
+  mysql_data:
+
+networks:
+  laravel_network:
+    driver: bridge
